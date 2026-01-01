@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<title>Sunwin AI</title>
+
+<style>
+body {
+    margin: 0;
+    height: 100vh;
+    background: radial-gradient(circle at top, #5b2626, #1a0707 75%);
+    font-family: "Segoe UI", Arial, sans-serif;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    color: #ffffff;
+}
+
+.container {
+    width: 480px;
+    background: linear-gradient(145deg, #6a2b2b, #2a0f0f);
+    border-radius: 18px;
+    padding: 26px;
+    border: 2px solid #caa46a;
+    box-shadow:
+        0 0 22px rgba(202, 164, 106, 0.45),
+        inset 0 0 20px rgba(255,255,255,0.08);
+}
+
+h1 {
+    text-align: center;
+    margin-bottom: 10px;
+    font-size: 28px;
+    color: #fff2dc;
+    text-shadow: 0 0 10px rgba(255,210,150,0.7);
+    letter-spacing: 1px;
+}
+
+.timer {
+    text-align: center;
+    margin-bottom: 18px;
+    font-size: 15px;
+    color: #ffd9a3;
+}
+
+.row {
+    display: flex;
+    justify-content: space-between;
+    padding: 8px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.15);
+    font-size: 15px;
+}
+
+.row:last-child {
+    border-bottom: none;
+}
+
+.label {
+    color: #ffd9a3;
+}
+
+.value {
+    font-weight: bold;
+    text-align: right;
+}
+
+.footer {
+    margin-top: 16px;
+    text-align: center;
+    font-size: 13px;
+    color: #e6cfa5;
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+    <h1>🎲 SUNWIN AI</h1>
+
+    <div class="timer">
+        ⏳ Làm mới sau <span id="countdown">60</span> giây
+    </div>
+
+    <div class="row"><span class="label">Phiên</span><span class="value" id="phien">--</span></div>
+    <div class="row"><span class="label">Xúc xắc 1</span><span class="value" id="d1">--</span></div>
+    <div class="row"><span class="label">Xúc xắc 2</span><span class="value" id="d2">--</span></div>
+    <div class="row"><span class="label">Xúc xắc 3</span><span class="value" id="d3">--</span></div>
+    <div class="row"><span class="label">Tổng</span><span class="value" id="tong">--</span></div>
+    <div class="row"><span class="label">Kết quả</span><span class="value" id="ketqua">--</span></div>
+    <div class="row"><span class="label">Phiên hiện tại</span><span class="value" id="phienht">--</span></div>
+    <div class="row"><span class="label">Dự đoán</span><span class="value" id="dudoan">--</span></div>
+    <div class="row"><span class="label">Cầu</span><span class="value" id="cau">--</span></div>
+
+    <div class="footer">
+        Sunwin Casino Predictor
+    </div>
+</div>
+
+<script>
+const REFRESH_TIME = 60;
+let countdown = REFRESH_TIME;
+
+async function loadSunwinData() {
+    try {
+        const res = await fetch("https://sunwinsaygex-tzz9.onrender.com/api/sun");
+        const data = await res.json();
+
+        document.getElementById("phien").textContent = data.phien ?? "--";
+        document.getElementById("d1").textContent = data.xuc_xac_1 ?? "--";
+        document.getElementById("d2").textContent = data.xuc_xac_2 ?? "--";
+        document.getElementById("d3").textContent = data.xuc_xac_3 ?? "--";
+        document.getElementById("tong").textContent = data.tong ?? "--";
+        document.getElementById("ketqua").textContent = data.ket_qua ?? "--";
+        document.getElementById("phienht").textContent = data.phien_hien_tai ?? "--";
+        document.getElementById("dudoan").textContent = data.du_doan ?? "--";
+        document.getElementById("cau").textContent = data.cau ?? "--";
+    } catch (e) {
+        document.getElementById("ketqua").textContent = "Lỗi API";
+    }
+}
+
+function startCountdown() {
+    document.getElementById("countdown").textContent = countdown;
+    countdown--;
+
+    if (countdown < 0) {
+        countdown = REFRESH_TIME;
+        loadSunwinData();
+    }
+}
+
+// Load lần đầu
+loadSunwinData();
+
+// Đếm ngược mỗi giây
+setInterval(startCountdown, 1000);
+</script>
+
+</body>
+</html>
