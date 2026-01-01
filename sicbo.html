@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<title>SICBO AI – MD5 Analyzer</title>
+<style>
+    body {
+        background:#0f1220;
+        color:#eaeaff;
+        font-family:Arial, Helvetica, sans-serif;
+        display:flex;
+        justify-content:center;
+        align-items:center;
+        height:100vh;
+    }
+    .box {
+        background:#181c3a;
+        padding:25px;
+        border-radius:12px;
+        width:420px;
+        box-shadow:0 0 20px rgba(0,0,0,0.4);
+    }
+    h1 {
+        text-align:center;
+        margin-bottom:20px;
+        color:#7cf3ff;
+    }
+    input {
+        width:100%;
+        padding:10px;
+        border-radius:6px;
+        border:none;
+        font-size:16px;
+        margin-bottom:10px;
+    }
+    button {
+        width:100%;
+        padding:10px;
+        font-size:16px;
+        border:none;
+        border-radius:6px;
+        cursor:pointer;
+        background:#3b82f6;
+        color:white;
+    }
+    button:hover {
+        background:#2563eb;
+    }
+    pre {
+        background:#0b0e1d;
+        padding:15px;
+        border-radius:8px;
+        margin-top:15px;
+        white-space:pre-wrap;
+    }
+</style>
+</head>
+<body>
+
+<div class="box">
+    <h1>🎲 SICBO AI</h1>
+    <input id="md5Input" placeholder="Nhập MD5 32 ký tự hex">
+    <button onclick="analyze()">PHÂN TÍCH</button>
+    <pre id="output"></pre>
+</div>
+
+<script>
+/* ====== HẰNG SỐ ====== */
+const AI_RAND_BOOST_THRESHOLD = 3.5;
+const AI_RAND_BOOST_FACTOR = 15.0;
+const AI_MAX_SCORE = 100.0;
+
+const DEEP_ENTROPY_WEIGHT = 10.0;
+const DEEP_ENTROPY_DIFF_BASELINE = 50.0;
+const DEEP_ENTROPY_DIFF_PENALTY = 20.0;
+const DEEP_SYMMETRY_WEIGHT = 30.0;
+const DEEP_REPEAT_PENALTY_WEIGHT = 15.0;
+const DEEP_MIN_SCORE = 0.0;
+const DEEP_MAX_SCORE = 100.0;
+
+/* ====== ENTROPY HEX ====== */
+function hexEntropy(hex) {
+    if (!hex) return 0;
+    const freq = {};
+    for (let c of hex) freq[c] = (freq[c] || 0) + 1;
+    let entropy = 0;
+    const total = hex.length;
+    for (let c in freq) {
+        const p = freq[c] / total;
+        entropy -= p * Math.log2(p);
+    }
+    return entropy;
+}
+
+/* ====== DEEP SCORE ====== */
+function deepScore(md5) {
+    const ent = hexEntropy(md5);
+    const freq = {};
+    for (let c of md5) freq[c] = (freq[c] || 0) + 1;
+    const repeated = Object.values(freq).filter(v => v > 2).length;
+    const repPenalty = repeated / Object.keys(freq).length;
+    const half = Math.floor(md5.length / 2);
+    let symmetryMatches = 0;
+    for (let i = 0; i < half; i++) {
+        if (md5[i] === md5[i + half]) symmetryMatches++;
+    }
+    const symmetry = symmetryMatches / half;
+    let score =
+        ent * DEEP_ENTROPY_WEIGHT +
+        (DEEP_ENTROPY_DIFF_BASELINE - ent * DEEP_ENTROPY_DIFF_PENALTY) +
+        symmetry * DEEP_SYMMETRY_WEIGHT -
+        repPenalty * DEEP_REPEAT_PENALTY_WEIGHT;
+    return Math.max(DEEP_MIN_SCORE, Math.min(DEEP_MAX_SCORE, score));
+}
+
+/* ====== XÁC SUẤT 3D6 ====== */
+function compute3D6() {
+    const counts = {};
+    for (let i = 3; i <= 18; i++) counts[i] = 0;
+    for (let d1 = 1; d1 <= 6; d1++)
+        for (let d2 = 1; d2 <= 6; d2++)
+            for (let d3 = 1; d3 <= 6; d3++)
+                counts[d1 + d2 + d3]++;
+    const total = 216;
+    const probs = {};
+    for (let k in counts) probs[k] = counts[k] / total;
+    return probs;
+}
+
+const PROBS_3D6 = compute3D6();
+const XIU_RANGE = Object.fromEntries(Object.entries(PROBS_3D6).filter(([k]) => k >= 4 && k <= 10));
+const TAI_RANGE = Object.fromEntries(Object.entries(PROBS_3D6).filter(([k]) => k >= 11 && k <= 17));
+
+/* ====== RNG SEED ====== */
+function seededRandom(seed) {
+    let x = Math.sin(seed++) * 10000;
+    return x - Math.floor(x);
+}
+
+/* ====== CHỌN VỊ LÓT ====== */
+function weightedSample(weightedMap, md5, entropy, deep) {
+    let items = Object.entries(weightedMap).map(([k, v]) => [Number(k), v]);
+    const seed = parseInt(md5.slice(0, 16), 16);
+    let localSeed = seed;
+
+    const boost = Math.max(0, (entropy - AI_RAND_BOOST_THRESHOLD) * AI_RAND_BOOST_FACTOR) * (deep / DEEP_MAX_SCORE);
+    items = items.map(([k, v]) => [k, v + boost]);
+
+    const selected = [];
+    while (selected.length < 3 && items.length > 0) {
+        const totalWeight = items.reduce((s, [, w]) => s + w, 0);
+        let r = seededRandom(localSeed++) * totalWeight;
+        let acc = 0;
+        for (let i = 0; i < items.length; i++) {
+            acc += items[i][1];
+            if (acc >= r) {
+                selected.push(items[i][0]);
+                items.splice(i, 1);
+                break;
+            }
+        }
+    }
+    return selected.sort((a, b) => a - b);
+}
+
+/* ====== PHÂN TÍCH ====== */
+function analyze() {
+    const md5 = document.getElementById("md5Input").value.trim().toLowerCase();
+    const out = document.getElementById("output");
+
+    if (!/^[0-9a-f]{32}$/.test(md5)) {
+        out.textContent = "❌ MD5 không hợp lệ!";
+        return;
+    }
+
+    const seed = parseInt(md5.slice(0, 16), 16);
+    let s = seed;
+    const d1 = Math.floor(seededRandom(s++) * 6) + 1;
+    const d2 = Math.floor(seededRandom(s++) * 6) + 1;
+    const d3 = Math.floor(seededRandom(s++) * 6) + 1;
+    const total = d1 + d2 + d3;
+    const triple = d1 === d2 && d2 === d3;
+
+    const entropy = hexEntropy(md5);
+    const deep = deepScore(md5);
+
+    let predicted, icon, range;
+    if (triple) {
+        predicted = `BỘ BA (${d1}-${d2}-${d3})`;
+        icon = "👑";
+        range = PROBS_3D6;
+    } else {
+        const threshold = 10.5 + (entropy - 4.0) + (deep / DEEP_MAX_SCORE);
+        if (total <= threshold) {
+            predicted = "XỈU";
+            icon = "❄️";
+            range = XIU_RANGE;
+        } else {
+            predicted = "TÀI";
+            icon = "🔥";
+            range = TAI_RANGE;
+        }
+    }
+
+    const lot = weightedSample(range, md5, entropy, deep);
+
+    out.textContent =
+`==============================
+${icon} DỰ ĐOÁN: ${predicted}
+🎯 VỊ LÓT: ${lot.join(" - ")}
+🔑 Entropy MD5: ${entropy.toFixed(3)}
+🧠 Deep Score: ${deep.toFixed(3)}
+==============================`;
+}
+</script>
+
+</body>
+</html>
